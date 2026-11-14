@@ -3,130 +3,188 @@
 <html lang="ps" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport"
- content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>د مالک پاسورډ جوړول</title>
 <style>
 body {
   font-family: sans-serif;
-  background: #f0f5fa;
-  margin: 0;
-  padding: 24px;
+  background: #eef4fa;
   color: #173454;
+  padding: 20px;
 }
 .card {
   background: white;
-  border-radius: 18px;
-  padding: 24px;
   max-width: 440px;
-  margin: 50px auto;
+  margin: 70px auto;
+  padding: 25px;
+  border-radius: 20px;
 }
 input, button {
   box-sizing: border-box;
   width: 100%;
-  padding: 15px;
-  margin-top: 12px;
-  border-radius: 10px;
+  padding: 16px;
+  margin-top: 15px;
   font-size: 16px;
+  border-radius: 12px;
 }
 input { border: 1px solid #ccd6e0; }
 button {
   background: #1464bc;
   color: white;
-  border: 0;
+  border: none;
 }
+button:disabled { opacity: 0.6; }
 [hidden] { display: none !important; }
-#message { line-height: 2; }
+#msg { line-height: 2; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
 <div class="card">
   <h2>هلمند موبلین او فلټر</h2>
-  <p>د مالک د پاسورډ بیا جوړول</p>
+  <p>د مالک پاسورډ بیا جوړول</p>
 
-  <section id="requestBox">
+  <div id="requestBox">
     <input id="email" type="email"
-     placeholder="خپل ایمېل ولیکه">
-    <button id="send">د پاسورډ لینک راولېږه</button>
-  </section>
+      placeholder="خپل ایمېل ولیکه">
+    <button id="send" type="button">
+      د پاسورډ لینک راولېږه
+    </button>
+  </div>
 
-  <section id="resetBox" hidden>
+  <div id="resetBox" hidden>
     <input id="password" type="password"
-     placeholder="نوی پاسورډ">
+      placeholder="نوی پاسورډ">
     <input id="confirm" type="password"
-     placeholder="نوی پاسورډ بیا ولیکه">
-    <button id="change">پاسورډ بدل کړه</button>
-  </section>
+      placeholder="پاسورډ بیا ولیکه">
+    <button id="change" type="button">
+      نوی پاسورډ ثبت کړه
+    </button>
+  </div>
 
-  <p id="message"></p>
+  <p id="msg" role="status"></p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-const URL = 'https://vsoykppxdohsaneenrae.supabase.co';
+const BASE = 'https://vsoykppxdohsaneenrae.supabase.co';
 const KEY = 'sb_publishable_YFBENIpmCrqI0F-YlCRz2Q_lqYWKJtK';
 
-const msg = document.getElementById('message');
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.hash.slice(1));
 
-if (!KEY.startsWith('sb_publishable_')) {
-  msg.textContent = 'لومړی Publishable key تنظیم کړه.';
-} else {
-  const recovering =
-    new URLSearchParams(location.hash.slice(1))
-      .get('type') === 'recovery';
+let token = null;
 
-  const client = supabase.createClient(URL, KEY, {
-    auth: { flowType: 'implicit',
-            detectSessionInUrl: true }
-  });
-
-  client.auth.onAuthStateChange((event, session) => {
-    if (session &&
-      (event === 'PASSWORD_RECOVERY' || recovering)) {
-      document.getElementById('requestBox').hidden = true;
-      document.getElementById('resetBox').hidden = false;
-      msg.textContent = 'اوس نوی پاسورډ جوړ کړه.';
-    }
-  });
-
-  document.getElementById('send').onclick = async () => {
-    const email = document.getElementById('email').value.trim();
-    if (!email) return;
-
-    const { error } =
-      await client.auth.resetPasswordForEmail(email, {
-        redirectTo: location.origin + location.pathname
-      });
-
-    msg.textContent = error
-      ? error.message
-      : 'که ایمېل ثبت وي، د بیا جوړولو لینک به ورولېږل شي.';
-  };
-
-  document.getElementById('change').onclick = async () => {
-    const password = document.getElementById('password').value;
-    const confirm = document.getElementById('confirm').value;
-
-    if (password.length < 8 || password !== confirm) {
-      msg.textContent =
-        'پاسورډ لږ تر لږه ۸ توري ولري او دواړه یو شان وي.';
-      return;
-    }
-
-    const { error } =
-      await client.auth.updateUser({ password });
-
-    if (error) {
-      msg.textContent = error.message;
-    } else {
-      await client.auth.signOut();
-      document.getElementById('resetBox').hidden = true;
-      msg.textContent =
-        'پاسورډ بدل شو! اوس خپل اپ ته ننوځه.';
-    }
-  };
+if (params.get('error_description')) {
+  $('msg').textContent = params.get('error_description');
 }
+
+if (params.get('type') === 'recovery' &&
+    params.get('access_token')) {
+  token = params.get('access_token');
+  $('requestBox').hidden = true;
+  $('resetBox').hidden = false;
+  $('msg').textContent = 'اوس نوی پاسورډ جوړ کړه.';
+  history.replaceState(null, '', location.pathname);
+}
+
+$('send').onclick = async function () {
+  const email = $('email').value.trim();
+
+  if (!email || !$('email').checkValidity()) {
+    $('msg').textContent = 'سم ایمېل ولیکه.';
+    return;
+  }
+
+  if (!KEY.startsWith('sb_publishable_')) {
+    $('msg').textContent = 'Publishable key سم نه دی.';
+    return;
+  }
+
+  $('send').disabled = true;
+  $('msg').textContent = 'د لینک لېږلو غوښتنه کېږي...';
+
+  try {
+    const redirect = location.origin + location.pathname;
+    const response = await fetch(
+      BASE + '/auth/v1/recover?redirect_to=' +
+        encodeURIComponent(redirect), {
+        method: 'POST',
+        headers: {
+          'apikey': KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.msg || data.message ||
+        data.error_description || 'HTTP ' + response.status
+      );
+    }
+
+    $('msg').textContent =
+      'غوښتنه ومنل شوه. که ایمېل ثبت وي، Gmail وګوره.';
+
+  } catch (error) {
+    $('msg').textContent = 'تېروتنه: ' + error.message;
+  } finally {
+    $('send').disabled = false;
+  }
+};
+
+$('change').onclick = async function () {
+  const password = $('password').value;
+  const confirm = $('confirm').value;
+
+  if (!token) {
+    $('msg').textContent = 'د پاسورډ نوی لینک خلاص کړه.';
+    return;
+  }
+
+  if (password.length < 8 || password !== confirm) {
+    $('msg').textContent =
+      'دواړه پاسورډونه یو شان او لږ تر لږه ۸ توري وي.';
+    return;
+  }
+
+  $('change').disabled = true;
+  $('msg').textContent = 'پاسورډ ثبتېږي...';
+
+  try {
+    const response = await fetch(BASE + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'apikey': KEY,
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.msg || data.message || 'HTTP ' + response.status
+      );
+    }
+
+    token = null;
+    $('password').value = '';
+    $('confirm').value = '';
+    $('resetBox').hidden = true;
+    $('msg').textContent =
+      'پاسورډ بدل شو! اوس خپل اپ ته ننوزه.';
+
+  } catch (error) {
+    $('msg').textContent = 'تېروتنه: ' + error.message;
+  } finally {
+    $('change').disabled = false;
+  }
+};
 </script>
 </body>
 </html>
-
