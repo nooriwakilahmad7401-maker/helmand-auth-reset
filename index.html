@@ -1,1 +1,132 @@
 
+<!DOCTYPE html>
+<html lang="ps" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+ content="width=device-width, initial-scale=1">
+<title>د مالک پاسورډ جوړول</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #f0f5fa;
+  margin: 0;
+  padding: 24px;
+  color: #173454;
+}
+.card {
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  max-width: 440px;
+  margin: 50px auto;
+}
+input, button {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px;
+  margin-top: 12px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+input { border: 1px solid #ccd6e0; }
+button {
+  background: #1464bc;
+  color: white;
+  border: 0;
+}
+[hidden] { display: none !important; }
+#message { line-height: 2; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>هلمند موبلین او فلټر</h2>
+  <p>د مالک د پاسورډ بیا جوړول</p>
+
+  <section id="requestBox">
+    <input id="email" type="email"
+     placeholder="خپل ایمېل ولیکه">
+    <button id="send">د پاسورډ لینک راولېږه</button>
+  </section>
+
+  <section id="resetBox" hidden>
+    <input id="password" type="password"
+     placeholder="نوی پاسورډ">
+    <input id="confirm" type="password"
+     placeholder="نوی پاسورډ بیا ولیکه">
+    <button id="change">پاسورډ بدل کړه</button>
+  </section>
+
+  <p id="message"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const URL = 'https://vsoykppxdohsaneenrae.supabase.co';
+const KEY = 'sb_publishable_YFBENIpmCrqI0F-YlCRz2Q_lqYWKJtK';
+
+const msg = document.getElementById('message');
+
+if (!KEY.startsWith('sb_publishable_')) {
+  msg.textContent = 'لومړی Publishable key تنظیم کړه.';
+} else {
+  const recovering =
+    new URLSearchParams(location.hash.slice(1))
+      .get('type') === 'recovery';
+
+  const client = supabase.createClient(URL, KEY, {
+    auth: { flowType: 'implicit',
+            detectSessionInUrl: true }
+  });
+
+  client.auth.onAuthStateChange((event, session) => {
+    if (session &&
+      (event === 'PASSWORD_RECOVERY' || recovering)) {
+      document.getElementById('requestBox').hidden = true;
+      document.getElementById('resetBox').hidden = false;
+      msg.textContent = 'اوس نوی پاسورډ جوړ کړه.';
+    }
+  });
+
+  document.getElementById('send').onclick = async () => {
+    const email = document.getElementById('email').value.trim();
+    if (!email) return;
+
+    const { error } =
+      await client.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + location.pathname
+      });
+
+    msg.textContent = error
+      ? error.message
+      : 'که ایمېل ثبت وي، د بیا جوړولو لینک به ورولېږل شي.';
+  };
+
+  document.getElementById('change').onclick = async () => {
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+
+    if (password.length < 8 || password !== confirm) {
+      msg.textContent =
+        'پاسورډ لږ تر لږه ۸ توري ولري او دواړه یو شان وي.';
+      return;
+    }
+
+    const { error } =
+      await client.auth.updateUser({ password });
+
+    if (error) {
+      msg.textContent = error.message;
+    } else {
+      await client.auth.signOut();
+      document.getElementById('resetBox').hidden = true;
+      msg.textContent =
+        'پاسورډ بدل شو! اوس خپل اپ ته ننوځه.';
+    }
+  };
+}
+</script>
+</body>
+</html>
+
